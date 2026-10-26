@@ -7,6 +7,7 @@ def generate_embedding(text: str) -> list[float]:
     response = client.embeddings.create(
         model=settings.EMBEDDING_MODEL,
         input=text,
+        dimensions=settings.EMBEDDING_DIMENSIONS,
     )
     return response.data[0].embedding
 

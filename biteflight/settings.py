@@ -101,7 +101,7 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 # Embedding model config
 EMBEDDING_MODEL = "text-embedding-3-large"
-EMBEDDING_DIMENSIONS = 3072
+EMBEDDING_DIMENSIONS = 1536
 
 # Chat / report model
 REPORT_MODEL = "gpt-6-sol"

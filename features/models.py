@@ -27,7 +27,7 @@ class FeatureRequest(models.Model):
     tags = models.JSONField(default=list, blank=True)
     sentiment = models.FloatField(null=True, blank=True)
     urgency = models.FloatField(null=True, blank=True)
-    embedding = VectorField(dimensions=3072, null=True, blank=True)
+    embedding = VectorField(dimensions=1536, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

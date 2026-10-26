@@ -11,6 +11,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
+        ("core", "0001_enable_pgvector"),
     ]
 
     operations = [
@@ -35,7 +36,7 @@ class Migration(migrations.Migration):
                 ('tags', models.JSONField(blank=True, default=list)),
                 ('sentiment', models.FloatField(blank=True, null=True)),
                 ('urgency', models.FloatField(blank=True, null=True)),
-                ('embedding', pgvector.django.vector.VectorField(blank=True, dimensions=3072, null=True)),
+                ('embedding', pgvector.django.vector.VectorField(blank=True, dimensions=1536, null=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
             ],
