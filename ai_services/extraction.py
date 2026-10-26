@@ -21,7 +21,7 @@ def extract_fields(title: str, description: str, segment: str) -> dict:
                 {"role": "user", "content": user_msg},
             ],
             response_format={"type": "json_object"},
-            max_tokens=200,
+            max_completion_tokens=200,
             temperature=0.1,
         )
         data = json.loads(response.choices[0].message.content)

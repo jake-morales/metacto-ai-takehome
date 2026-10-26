@@ -5,6 +5,10 @@
 
 {% block extra_head %}
 <style>
+  #sessions-sidebar { transition: width 0.2s ease; overflow: hidden; flex-shrink: 0; }
+  #sessions-sidebar.collapsed { width: 0; border: none; }
+</style>
+<style>
   .prose-dark { color: #cbd5e1; line-height: 1.7; }
   .prose-dark h1,.prose-dark h2,.prose-dark h3 { color: #f1f5f9; font-weight: 700; margin: 1rem 0 0.5rem; }
   .prose-dark h1 { font-size: 1.25rem; }
@@ -25,7 +29,7 @@
 <div class="flex h-[calc(100vh-4rem)] -m-6 overflow-hidden">
 
   <!-- Sessions sidebar -->
-  <div class="w-56 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden">
+  <div id="sessions-sidebar" class="w-56 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden">
     <div class="p-3 border-b border-slate-700">
       <form method="post" action="{% url 'create_report_session' %}">
         {% csrf_token %}
@@ -54,6 +58,10 @@
 
     <!-- Rename bar -->
     <div class="flex items-center gap-3 px-4 py-2.5 bg-slate-800 border-b border-slate-700">
+      <button onclick="toggleSessionsSidebar()" title="Toggle sessions"
+        class="text-slate-500 hover:text-slate-300 transition text-sm flex-shrink-0">
+        <span id="sessions-toggle-icon">◀</span>
+      </button>
       <form method="post" action="{% url 'rename_report_session' session.pk %}" class="flex-1 flex gap-2">
         {% csrf_token %}
         <input type="text" name="title" value="{{ session.title }}"
@@ -72,14 +80,36 @@
       {% for message in messages %}
         {% if message.role == "user" %}
           <div class="flex justify-end">
-            <div class="max-w-2xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed">
-              {{ message.content }}
+            <div class="max-w-2xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed prose-dark">
+              {{ message.content|markdown }}
             </div>
           </div>
         {% else %}
           <div class="flex justify-start">
-            <div class="max-w-3xl bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-sm px-5 py-4">
-              <div class="prose-dark text-sm">{{ message.content|markdown }}</div>
+            <div class="max-w-3xl w-full">
+              {% if message.rag_used %}
+                <details class="mb-2 group">
+                  <summary class="flex items-center gap-2 cursor-pointer list-none select-none w-fit">
+                    <span class="flex items-center gap-1.5 bg-slate-800 border border-slate-600 text-slate-400 text-xs px-3 py-1.5 rounded-lg hover:border-indigo-500 hover:text-indigo-400 transition">
+                      <span class="text-indigo-400">⚙</span>
+                      searched feature requests
+                      <span class="text-slate-500">({{ message.rag_result_count }} results)</span>
+                      <span class="text-slate-600 group-open:rotate-180 transition-transform inline-block">▾</span>
+                    </span>
+                  </summary>
+                  <div class="mt-1 ml-1 pl-3 border-l border-slate-700 text-xs text-slate-500 py-1">
+                    Semantic search over {{ message.rag_result_count }} feature request{{ message.rag_result_count|pluralize }} injected as context before generating this response.
+                  </div>
+                </details>
+              {% endif %}
+              <div class="bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-sm px-5 py-4">
+                <div class="prose-dark text-sm">{{ message.content|markdown }}</div>
+              </div>
+              {% if message.input_tokens %}
+                <div class="mt-1 px-1 text-xs text-slate-600">
+                  {{ message.input_tokens }} in / {{ message.output_tokens }} out tokens
+                </div>
+              {% endif %}
             </div>
           </div>
         {% endif %}
@@ -97,6 +127,12 @@
     <div class="border-t border-slate-700 p-4 bg-slate-900">
       <form id="chat-form" method="post" action="{% url 'send_chat_message' session.pk %}">
         {% csrf_token %}
+        <div class="flex items-center gap-2 mb-2">
+          <label class="text-xs text-slate-500">Model</label>
+          <select name="model" class="bg-slate-800 border border-slate-600 text-slate-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+            <option value="gpt-6-sol">gpt-6-sol</option>
+          </select>
+        </div>
         <div class="flex gap-3">
           <textarea
             name="content"
@@ -183,7 +219,7 @@ function submitMessage() {
   const messages = document.getElementById('messages');
   const userDiv = document.createElement('div');
   userDiv.className = 'flex justify-end';
-  userDiv.innerHTML = `<div class="max-w-2xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed">${content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+  userDiv.innerHTML = `<div class="max-w-2xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed" style="white-space:pre-wrap">${content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
   messages.insertBefore(userDiv, document.getElementById('streaming-area'));
 
   input.value = '';
@@ -214,5 +250,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Scroll to bottom on load
 document.addEventListener('DOMContentLoaded', scrollToBottom);
+
+function toggleSessionsSidebar() {
+  const sidebar = document.getElementById('sessions-sidebar');
+  const icon = document.getElementById('sessions-toggle-icon');
+  const collapsed = sidebar.classList.toggle('collapsed');
+  sidebar.style.width = collapsed ? '0' : '14rem';
+  icon.textContent = collapsed ? '▶' : '◀';
+  localStorage.setItem('sessions-sidebar-collapsed', collapsed);
+}
+
+// Restore state on load
+(function() {
+  if (localStorage.getItem('sessions-sidebar-collapsed') === 'true') {
+    const sidebar = document.getElementById('sessions-sidebar');
+    const icon = document.getElementById('sessions-toggle-icon');
+    sidebar.classList.add('collapsed');
+    sidebar.style.width = '0';
+    icon.textContent = '▶';
+  }
+})();
 </script>
 {% endblock %}

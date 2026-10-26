@@ -42,12 +42,19 @@ def report_chat(request, pk):
     })
 
 
+ALLOWED_MODELS = {"gpt-6-sol"}
+
 @require_POST
 def send_message(request, pk):
     session = get_object_or_404(ChatSession, pk=pk)
     content = request.POST.get("content", "").strip()
     if not content:
         return redirect("report_chat", pk=pk)
+
+    model = request.POST.get("model", "gpt-6-sol")
+    if model in ALLOWED_MODELS and session.model != model:
+        session.model = model
+        session.save(update_fields=["model"])
 
     ChatMessage.objects.create(
         session=session,
@@ -64,7 +71,7 @@ def stream_response(request, pk):
     session = get_object_or_404(ChatSession, pk=pk)
 
     response = StreamingHttpResponse(
-        stream_chat_response(str(session.pk)),
+        stream_chat_response(str(session.pk), model=session.model),
         content_type="text/event-stream",
     )
     response["Cache-Control"] = "no-cache"

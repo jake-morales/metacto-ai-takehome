@@ -36,23 +36,29 @@ Total requests: {total_requests}
 - From drivers: {driver_count}
 - From merchants: {merchant_count}
 
-## Top Voted Roadmap Items
-{top_voted}
+## Current Roadmap
+{roadmap_items}
 
-## Feature Clusters (AI-grouped themes)
+## Feature Clusters from Latest Clustering Run
 {cluster_summaries}
 
-Your role is to help the product team understand priorities, identify patterns, and make strategic decisions about the roadmap. Be specific, data-driven, and always tie recommendations back to the company goals. When given additional context from feature requests, use it to support your analysis."""
+Your role is to help the product team understand priorities and make strategic roadmap decisions. Always tie recommendations back to the company mission and goals. Be specific and explain your reasoning."""
 
-REPORT_INITIAL_PROMPT = """Analyze our feature requests and generate a prioritized product report. Include:
+REPORT_INITIAL_PROMPT = """Generate a product analysis report with two sections:
 
-1. **Executive Summary** — top 3 strategic priorities based on our goals
-2. **By Segment** — key themes and top requests from users, drivers, and merchants
-3. **Cross-Segment Opportunities** — features that benefit multiple segments
-4. **Recommended Roadmap Actions** — specific next steps with rationale
-5. **Risks & Gaps** — requests with high urgency/frustration that need attention
+## 1. Top 5 Requested Features
+Based on the clustering data, identify the 5 most-requested feature themes. For each:
+- Name the theme and which customer segment(s) it comes from
+- Summarize what customers are asking for
+- State why it matters (volume, urgency, or strategic fit)
 
-Be concise and actionable."""
+## 2. Recommended Roadmap Changes
+Review the current roadmap against our company goals and mission. For each recommendation:
+- State whether to **Add**, **Reprioritize**, **Accelerate**, or **Remove** a roadmap item
+- Explain your reasoning — reference the goals/mission and relevant vote counts or feature clusters
+- Flag any highly-voted or high-urgency requests that are missing from the roadmap entirely
+
+Be direct and specific. Show your reasoning."""
 
 RAG_CONTEXT_INJECTION = """## Additional Context: Relevant Feature Requests
 The following {count} feature requests are most semantically similar to your question:

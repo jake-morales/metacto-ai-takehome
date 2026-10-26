@@ -24,15 +24,19 @@ def build_system_prompt() -> str:
     }
     total = sum(segment_counts.values())
 
-    top_voted = RoadmapItem.objects.order_by("-vote_count")[:5]
-    top_voted_text = "\n".join(
-        f"- {item.title} ({item.vote_count} votes, status: {item.status})"
-        for item in top_voted
-    ) or "No roadmap items yet."
+    roadmap_items = RoadmapItem.objects.order_by("-vote_count")
+    if roadmap_items.exists():
+        roadmap_text = "\n".join(
+            f"- [{item.status}] {item.title} — {item.vote_count} votes"
+            + (f"\n  {item.description}" if item.description else "")
+            for item in roadmap_items
+        )
+    else:
+        roadmap_text = "No roadmap items yet."
 
     latest_run = ClusteringRun.objects.filter(status="completed").order_by("-started_at").first()
     if latest_run:
-        clusters = latest_run.clusters.order_by("-request_count")[:15]
+        clusters = latest_run.clusters.order_by("-request_count")
         cluster_summaries = "\n\n".join(
             f"**{c.label}** ({c.request_count} requests, theme: {c.theme})\n{c.summary}"
             for c in clusters
@@ -46,12 +50,12 @@ def build_system_prompt() -> str:
         user_count=segment_counts["user"],
         driver_count=segment_counts["driver"],
         merchant_count=segment_counts["merchant"],
-        top_voted=top_voted_text,
+        roadmap_items=roadmap_text,
         cluster_summaries=cluster_summaries,
     )
 
 
-def stream_chat_response(session_id):
+def stream_chat_response(session_id, model=None):
     """
     Generator that yields SSE-formatted strings.
     Fetches the session's message history, optionally injects RAG context,
@@ -65,46 +69,59 @@ def stream_chat_response(session_id):
 
     openai_messages = [{"role": "system", "content": session.system_prompt}]
 
+    client = get_client()
+    full_response = []
+    input_tokens = None
+    output_tokens = None
+    rag_used = False
+    rag_result_count = None
+
     # For follow-up questions (more than the initial), inject RAG context
     user_messages = [m for m in messages if m.role == "user"]
     if len(user_messages) > 1:
         latest_user_msg = user_messages[-1].content
-        rag_context = _build_rag_context(latest_user_msg)
-        # Insert RAG context as a system message just before the last user message
+        rag_context, rag_count = _build_rag_context(latest_user_msg)
+        if rag_context:
+            rag_used = True
+            rag_result_count = rag_count
         for msg in messages[:-1]:
             openai_messages.append({"role": msg.role, "content": msg.content})
-        openai_messages.append({"role": "system", "content": rag_context})
+        if rag_context:
+            openai_messages.append({"role": "system", "content": rag_context})
         openai_messages.append({"role": "user", "content": latest_user_msg})
     else:
         for msg in messages:
             openai_messages.append({"role": msg.role, "content": msg.content})
 
-    client = get_client()
-    full_response = []
-
     try:
         stream = client.chat.completions.create(
-            model=settings.REPORT_MODEL,
+            model=model or settings.REPORT_MODEL,
             messages=openai_messages,
             stream=True,
-            max_tokens=2000,
-            temperature=0.4,
+            max_completion_tokens=2000,
+            stream_options={"include_usage": True},
         )
 
         for chunk in stream:
+            if chunk.usage:
+                input_tokens = chunk.usage.prompt_tokens
+                output_tokens = chunk.usage.completion_tokens
             delta = chunk.choices[0].delta if chunk.choices else None
             if delta and delta.content:
                 token = delta.content
                 full_response.append(token)
-                # SSE format: "data: <token>\n\n"
                 yield f"data: {token}\n\n"
 
-        # Save complete assistant message
+        # Save complete assistant message with token counts
         complete_text = "".join(full_response)
         ChatMessage.objects.create(
             session=session,
             role="assistant",
             content=complete_text,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            rag_used=rag_used,
+            rag_result_count=rag_result_count,
         )
         yield "data: [DONE]\n\n"
 
@@ -112,16 +129,16 @@ def stream_chat_response(session_id):
         yield f"data: [ERROR] {str(e)}\n\n"
 
 
-def _build_rag_context(question: str) -> str:
+def _build_rag_context(question: str) -> tuple[str, int]:
     try:
         embedding = generate_embedding(question)
         similar = search_similar_requests(embedding, top_k=20)
         if not similar:
-            return ""
+            return "", 0
         requests_text = "\n".join(
             f"- [{r.segment}] {r.title}: {r.description[:300]}"
             for r in similar
         )
-        return RAG_CONTEXT_INJECTION.format(count=len(similar), requests=requests_text)
+        return RAG_CONTEXT_INJECTION.format(count=len(similar), requests=requests_text), len(similar)
     except Exception:
-        return ""
+        return "", 0

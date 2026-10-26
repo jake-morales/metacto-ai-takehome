@@ -149,7 +149,7 @@ def _generate_cluster_label(count: int, samples_text: str) -> tuple[dict, int, i
                 {"role": "user", "content": CLUSTER_LABEL_USER.format(count=count, samples=samples_text)},
             ],
             response_format={"type": "json_object"},
-            max_tokens=150,
+            max_completion_tokens=150,
             temperature=0.3,
         )
         input_tok = response.usage.prompt_tokens if response.usage else 0
