@@ -13,6 +13,9 @@ class ClusteringRun(models.Model):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     num_clusters = models.PositiveIntegerField(null=True, blank=True)
     num_requests_processed = models.PositiveIntegerField(null=True, blank=True)
+    input_tokens = models.PositiveIntegerField(null=True, blank=True)
+    output_tokens = models.PositiveIntegerField(null=True, blank=True)
+    duration_seconds = models.FloatField(null=True, blank=True)
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

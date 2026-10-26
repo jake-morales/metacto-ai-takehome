@@ -1,4 +1,5 @@
 import json
+import time
 import numpy as np
 from django.conf import settings
 from django.utils import timezone
@@ -19,6 +20,10 @@ def run_clustering(run_id: str):
     run = ClusteringRun.objects.get(id=run_id)
     run.status = "running"
     run.save(update_fields=["status"])
+
+    total_input_tokens = 0
+    total_output_tokens = 0
+    start_time = time.monotonic()
 
     try:
         requests = list(
@@ -93,7 +98,9 @@ def run_clustering(run_id: str):
                 for r in sample_requests
             )
 
-            label_data = _generate_cluster_label(len(members), samples_text)
+            label_data, input_tok, output_tok = _generate_cluster_label(len(members), samples_text)
+            total_input_tokens += input_tok
+            total_output_tokens += output_tok
 
             cluster = Cluster.objects.create(
                 run=run,
@@ -102,6 +109,7 @@ def run_clustering(run_id: str):
                 theme=label_data.get("theme", ""),
                 request_count=len(members),
             )
+
 
             memberships = []
             for idx, prob in members:
@@ -117,6 +125,9 @@ def run_clustering(run_id: str):
 
         run.status = "completed"
         run.completed_at = timezone.now()
+        run.input_tokens = total_input_tokens
+        run.output_tokens = total_output_tokens
+        run.duration_seconds = time.monotonic() - start_time
         run.save()
 
     except Exception as e:
@@ -128,7 +139,7 @@ def run_clustering(run_id: str):
     return run
 
 
-def _generate_cluster_label(count: int, samples_text: str) -> dict:
+def _generate_cluster_label(count: int, samples_text: str) -> tuple[dict, int, int]:
     client = get_client()
     try:
         response = client.chat.completions.create(
@@ -141,6 +152,8 @@ def _generate_cluster_label(count: int, samples_text: str) -> dict:
             max_tokens=150,
             temperature=0.3,
         )
-        return json.loads(response.choices[0].message.content)
+        input_tok = response.usage.prompt_tokens if response.usage else 0
+        output_tok = response.usage.completion_tokens if response.usage else 0
+        return json.loads(response.choices[0].message.content), input_tok, output_tok
     except Exception:
-        return {"label": "Unnamed Cluster", "summary": "", "theme": ""}
+        return {"label": "Unnamed Cluster", "summary": "", "theme": ""}, 0, 0

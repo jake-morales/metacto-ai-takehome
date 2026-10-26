@@ -11,6 +11,8 @@
           </span>
           {% if latest_run.status == 'completed' %}
             — {{ latest_run.num_clusters }} cluster{{ latest_run.num_clusters|pluralize }} from {{ latest_run.num_requests_processed }} requests
+            {% if latest_run.input_tokens %}· {{ latest_run.input_tokens }} in / {{ latest_run.output_tokens }} out tokens{% endif %}
+            {% if latest_run.duration_seconds %}· {{ latest_run.duration_seconds|floatformat:"1" }}s{% endif %}
           {% endif %}
         </p>
       {% else %}

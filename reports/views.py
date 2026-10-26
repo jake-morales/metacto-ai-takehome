@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.http import StreamingHttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
 from .models import ChatSession, ChatMessage
 from ai_services.prompts import REPORT_INITIAL_PROMPT
 from ai_services.reports import build_system_prompt, stream_chat_response
@@ -16,13 +17,9 @@ def session_list(request):
 @require_POST
 def create_session(request):
     system_prompt = build_system_prompt()
-    session = ChatSession.objects.create(system_prompt=system_prompt)
-    # Save pre-loaded user prompt as first message
-    ChatMessage.objects.create(
-        session=session,
-        role=ChatMessage.Role.USER,
-        content=REPORT_INITIAL_PROMPT,
-    )
+    now = timezone.now()
+    title = now.strftime("%b %d, %Y %I:%M %p")
+    session = ChatSession.objects.create(system_prompt=system_prompt, title=title)
     return redirect("report_chat", pk=session.pk)
 
 
@@ -30,7 +27,9 @@ def report_chat(request, pk):
     session = get_object_or_404(ChatSession, pk=pk)
     sessions = ChatSession.objects.all()
     messages = session.messages.all()
-    # Check if first message has a response yet
+    # Pre-fill the prompt in the input for fresh sessions (no messages yet)
+    is_fresh = messages.count() == 0
+    # Still need to detect "sent first message, waiting for response"
     needs_initial_response = (
         messages.count() == 1 and messages.first().role == ChatMessage.Role.USER
     )
@@ -39,7 +38,7 @@ def report_chat(request, pk):
         "sessions": sessions,
         "messages": messages,
         "needs_initial_response": needs_initial_response,
-        "initial_prompt": REPORT_INITIAL_PROMPT,
+        "initial_prompt": REPORT_INITIAL_PROMPT if is_fresh else "",
     })
 
 
