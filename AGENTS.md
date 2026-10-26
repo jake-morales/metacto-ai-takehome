@@ -1,5 +1,13 @@
 # AGENTS.md — AI-First Feature Request Tracker (BiteFlight PoC)
 
+## Project Rules
+
+### Prompt Logging
+
+Every time you receive a new instruction or prompt, append it to prompts.txt in the project root with a timestamp (ISO 8601) and a brief summary of what you did in response. Create the file if it doesn't exist. Keep this log updated throughout all sessions.
+
+---
+
 ## Project Overview
 
 An AI-first feature request tracking system, built as a proof of concept in the context of **BiteFlight**, a food delivery company. The system ingests feature requests from three customer types (users, drivers, merchants), uses AI to deduplicate, cluster, and prioritize them, and surfaces actionable insights for internal product teams.
@@ -26,170 +34,209 @@ Each segment has distinct pain points; the system must capture, tag, and reason 
 
 ## Core Capabilities
 
-### 1. Submit a Feature Request
-- Customers submit free-text feature requests via an API.
-- Each request captures: submitter identity, customer segment, free-text description, optional category/tags, timestamp.
-- AI processing on ingest: extract structured fields (intent, affected area, sentiment, urgency signals) and generate an embedding for similarity search.
+### 1. Submit a Feature Request (Page 1 — Customer)
+- Customers submit free-text feature requests via a form.
+- Each request captures: submitter name (optional), customer segment, title, description, timestamp.
+- AI processing on ingest (Huey background task): extract structured fields (category, tags, sentiment, urgency) via GPT-4o-mini and generate an embedding via text-embedding-3-large.
 
-### 2. View & Discover Existing Requests
-- Customers can browse and search feature requests.
-- **Semantic search** (vector similarity) so users find related requests even with different wording.
-- Filter/facet by: segment, status, category, popularity, date range.
-- AI-generated summaries for clusters of similar requests.
+### 2. Product Roadmap & Voting (Page 2 — Customer)
+- Customers view a **curated roadmap** of RoadmapItems grouped by status (Shipped, In Progress, Planned).
+- Displayed as a vertical timeline with quarter labels and target dates.
+- Vote button (HTMX POST, updates count without page reload).
+- Session-based voting: one vote per RoadmapItem per browser session.
+- Customers vote on **RoadmapItems only** (curated by product team), not raw FeatureRequests.
 
-### 3. Express Interest / Support
-- Customers can upvote or "+1" an existing request.
-- Track interest signals: vote count, unique voter segments, velocity of votes over time.
-- Support actions feed into prioritization scoring.
+### 3. Internal Roadmap Editor (Page 3 — Internal)
+- Create, edit, reorder, and delete RoadmapItems.
+- Set status, target date, and link feature requests.
 
-### 4. Internal Product Team Insights
-- **AI-powered grouping**: automatically cluster related requests using embeddings + clustering algorithms.
-- **Prioritization scoring**: combine vote count, segment diversity, recency, sentiment, and strategic alignment into a composite score.
-- **Report generation**: on-demand or scheduled reports summarizing top themes, emerging trends, segment-specific priorities, and recommended actions.
-- Reports must generate quickly even at scale (target: seconds, not minutes).
+### 4. Company Goals & Mission (Page 4 — Internal)
+- Singleton model for mission statement and goals.
+- These feed into AI report generation as context.
+
+### 5. AI Reports & Chat (Page 5 — Internal)
+- Chat interface with SSE streaming (StreamingHttpResponse + EventSource JS).
+- Pre-loaded prompt with company goals, cluster summaries, and aggregate stats.
+- Follow-up questions use RAG: embed user question, pgvector cosine similarity for top 20 matching requests, inject as context.
+- Markdown rendering for AI responses.
+- Session history saved and reloadable.
+
+### 6. Cluster Viewer (Page 6 — Internal)
+- Trigger HDBSCAN clustering over stored embeddings.
+- AI-generated cluster labels and summaries (GPT-4o-mini).
+- Grid of clusters with request count, avg sentiment, total votes.
+- Click cluster to see sample feature requests.
 
 ---
 
 ## Technical Architecture
 
-### Stack Recommendations
+### Stack
 
 | Layer              | Technology                  | Rationale                                                    |
 |--------------------|-----------------------------|--------------------------------------------------------------|
-| **Backend API**    | Python (FastAPI)            | Async-native, fast, great AI/ML library ecosystem            |
-| **Database**       | PostgreSQL + pgvector       | Relational data + vector similarity search in one store      |
-| **AI/Embeddings**  | Claude API (via Anthropic SDK) for analysis; an embedding model for vectors | Structured extraction, summarization, report generation |
-| **Task Queue**     | Background tasks (FastAPI BackgroundTasks or Celery for heavier loads) | Async AI processing on ingest without blocking requests |
-| **Frontend**       | React (Vite) or simple API-only for PoC | Keep PoC scope manageable; API-first design                 |
+| **Backend**        | Django 5.1                  | Backend + frontend in one, mature ORM, admin                 |
+| **Database**       | PostgreSQL 16 + pgvector    | Relational data + vector similarity search in one store      |
+| **AI Models**      | OpenAI (text-embedding-3-large, gpt-4o-mini, gpt-6-sol) | Embeddings, extraction, report generation |
+| **Task Queue**     | django-huey + Redis         | Lightweight background jobs for AI processing on ingest      |
+| **Frontend**       | Django templates + HTMX     | Server-rendered HTML with partial updates, no JS framework   |
+| **Styling**        | Tailwind CSS (CDN)          | Fast prototyping, no build tooling                           |
+| **Containers**     | Docker Compose              | PostgreSQL+pgvector, Redis, Django, Huey worker              |
 
-### Data Model (Core Entities)
+### Data Models
 
 ```
 FeatureRequest
   id: UUID
-  title: str (AI-extracted or user-provided)
+  title: str
   description: text
-  submitter_id: str
+  submitter_name: str (optional, no auth)
   segment: enum(user, driver, merchant)
   status: enum(new, under_review, planned, in_progress, shipped, declined)
   category: str (AI-assigned)
-  tags: str[]
-  embedding: vector(1536)
-  sentiment: float
-  urgency: float
-  created_at: timestamp
-  updated_at: timestamp
+  tags: JSONField (AI-assigned)
+  sentiment: float (AI-assigned, -1 to 1)
+  urgency: float (AI-assigned, 0 to 1)
+  embedding: vector(1536) — text-embedding-3-large truncated to 1536 dims
+  created_at, updated_at: timestamps
 
 Vote
   id: UUID
-  request_id: FK -> FeatureRequest
-  voter_id: str
-  voter_segment: enum(user, driver, merchant)
-  created_at: timestamp
+  roadmap_item: FK -> RoadmapItem
+  session_key: str (Django session key, no auth)
+  unique_together: (roadmap_item, session_key)
+
+RoadmapItem
+  id: UUID
+  title: str
+  description: text
+  status: enum(planned, in_progress, shipped)
+  target_date: date (optional)
+  order: int
+  vote_count: int (denormalized)
+  linked_requests: M2M -> FeatureRequest
+  quarter_label: computed property (e.g. "Q1 2027")
+
+CompanyGoals (singleton, pk=1)
+  mission: text
+  goals: text
+  updated_at: timestamp
+
+ChatSession
+  id: UUID
+  title: str
+  system_prompt: text (snapshot of goals + context)
+
+ChatMessage
+  id: UUID
+  session: FK -> ChatSession
+  role: enum(system, user, assistant)
+  content: text
+
+ClusteringRun
+  id: UUID
+  status: str (pending, running, completed, failed)
+  num_clusters, num_requests_processed: int
 
 Cluster
   id: UUID
+  run: FK -> ClusteringRun
   label: str (AI-generated)
   summary: text (AI-generated)
   theme: str
-  request_ids: UUID[]
-  score: float (prioritization composite)
-  created_at: timestamp
-  updated_at: timestamp
+  request_count: int
+  avg_sentiment: float
+  total_votes: int
 
-Report
-  id: UUID
-  type: enum(segment_summary, trend_analysis, full_prioritization)
-  content: jsonb
-  generated_at: timestamp
-  parameters: jsonb (filters used to generate)
+ClusterMembership
+  cluster: FK -> Cluster
+  request: FK -> FeatureRequest
+  similarity_score: float
 ```
 
-### Key Design Decisions for Scale
+### Key Design Decisions
 
-1. **Embeddings at ingest**: compute and store embeddings when a request is created (async background task) so search and clustering read pre-computed vectors.
-2. **pgvector for similarity**: avoids a separate vector DB dependency; PostgreSQL handles both relational queries and ANN search. Use IVFFlat or HNSW indexes for fast retrieval at scale.
-3. **Pre-computed clusters**: run clustering periodically (or on-demand) rather than on every query. Store cluster assignments so reports pull from materialized results.
-4. **Incremental processing**: new requests get assigned to the nearest existing cluster (or flagged for re-clustering) rather than re-clustering the entire dataset.
-5. **Caching for reports**: cache generated reports with TTL; invalidate on significant data changes.
-
----
-
-## AI Integration Points
-
-| Operation                  | Model / Approach                          | When it runs              |
-|----------------------------|-------------------------------------------|---------------------------|
-| Extract structured fields  | Claude API (structured output)            | On request submission     |
-| Generate embedding         | Embedding model (e.g., voyage, or OpenAI ada) | On request submission     |
-| Find similar requests      | pgvector cosine similarity search         | On search / discovery     |
-| Cluster requests           | HDBSCAN or K-means on embeddings          | Periodic batch job        |
-| Generate cluster summaries | Claude API                                | After clustering          |
-| Prioritization scoring     | Weighted formula + Claude for qualitative assessment | On-demand / scheduled   |
-| Report generation          | Claude API (structured output → formatted report) | On-demand / scheduled   |
-
----
-
-## API Design (Key Endpoints)
-
-```
-POST   /api/requests              — Submit a new feature request
-GET    /api/requests              — List/search requests (filters, pagination, semantic search)
-GET    /api/requests/{id}         — Get single request with vote count
-POST   /api/requests/{id}/vote    — Vote for a request
-DELETE /api/requests/{id}/vote    — Remove vote
-
-GET    /api/clusters              — List clusters with summaries and scores
-GET    /api/clusters/{id}         — Get cluster detail with member requests
-POST   /api/clusters/refresh      — Trigger re-clustering
-
-POST   /api/reports/generate      — Generate a report (params: type, filters)
-GET    /api/reports               — List generated reports
-GET    /api/reports/{id}          — Get a specific report
-
-GET    /api/insights/trending     — Trending requests / emerging themes
-GET    /api/insights/segments     — Per-segment breakdown
-```
+1. **Embeddings at ingest**: compute and store embeddings when a request is created (Huey background task) so search and clustering read pre-computed vectors.
+2. **pgvector for similarity**: avoids a separate vector DB dependency; PostgreSQL handles both relational queries and ANN search. HNSW index for fast retrieval (limited to 2000 dims, so embeddings truncated to 1536).
+3. **Pre-computed clusters**: run clustering on-demand rather than on every query. Store cluster assignments so reports pull from materialized results.
+4. **SSE for chat streaming**: Django StreamingHttpResponse with text/event-stream content type; OpenAI stream=True forwards chunks as SSE events. Frontend uses EventSource.
+5. **Session-based voting**: no authentication required; uses Django session keys for vote deduplication.
+6. **Two visual themes**: Customer pages use orange/amber with top navbar; Internal pages use indigo/slate with sidebar navigation.
 
 ---
 
 ## Project Structure
 
 ```
-biteflight-feature-tracker/
-├── backend/
-│   ├── app/
-│   │   ├── main.py              # FastAPI app entry point
-│   │   ├── config.py            # Settings & environment config
-│   │   ├── models/              # SQLAlchemy / Pydantic models
-│   │   │   ├── request.py
-│   │   │   ├── vote.py
-│   │   │   ├── cluster.py
-│   │   │   └── report.py
-│   │   ├── api/                 # Route handlers
-│   │   │   ├── requests.py
-│   │   │   ├── votes.py
-│   │   │   ├── clusters.py
-│   │   │   ├── reports.py
-│   │   │   └── insights.py
-│   │   ├── services/            # Business logic
-│   │   │   ├── ai.py            # Claude API integration
-│   │   │   ├── embeddings.py    # Embedding generation & search
-│   │   │   ├── clustering.py    # Clustering logic
-│   │   │   ├── scoring.py       # Prioritization scoring
-│   │   │   └── reports.py       # Report generation
-│   │   ├── db/                  # Database setup & migrations
-│   │   │   ├── session.py
-│   │   │   └── migrations/
-│   │   └── tasks/               # Background task definitions
-│   │       └── ingest.py
-│   ├── tests/
-│   ├── requirements.txt
-│   └── Dockerfile
-├── frontend/                    # Optional for PoC
-│   └── ...
-├── docker-compose.yml           # PostgreSQL + pgvector + app
-├── seed_data/                   # Sample BiteFlight feature requests
-│   └── requests.json
+metacto-ai-takehome/
+├── manage.py
+├── biteflight/                  # Django project config
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+├── core/                        # Shared: base templates, pgvector migration
+│   ├── migrations/
+│   │   └── 0001_enable_pgvector.py
+│   └── templatetags/
+│       └── markdown_extras.py
+├── features/                    # Feature requests + voting
+│   ├── models.py                # FeatureRequest, Vote
+│   ├── forms.py                 # FeatureRequestForm
+│   ├── views.py                 # Submit, roadmap, vote
+│   ├── tasks.py                 # Huey: embedding + extraction
+│   └── urls.py
+├── roadmap/                     # Internal roadmap management
+│   ├── models.py                # RoadmapItem
+│   ├── forms.py
+│   ├── views.py
+│   └── urls.py
+├── goals/                       # Company goals (singleton)
+│   ├── models.py                # CompanyGoals
+│   ├── forms.py
+│   ├── views.py
+│   └── urls.py
+├── reports/                     # AI reports & chat
+│   ├── models.py                # ChatSession, ChatMessage
+│   ├── views.py                 # Chat + SSE streaming
+│   └── urls.py
+├── clusters/                    # Clustering & viewer
+│   ├── models.py                # ClusteringRun, Cluster, ClusterMembership
+│   ├── views.py
+│   ├── tasks.py                 # Huey: run clustering
+│   └── urls.py
+├── ai_services/                 # Pure Python module (not a Django app)
+│   ├── client.py                # OpenAI client singleton
+│   ├── embeddings.py            # Generate & search embeddings
+│   ├── extraction.py            # Extract category/sentiment/urgency
+│   ├── clustering.py            # HDBSCAN clustering
+│   ├── reports.py               # RAG context assembly + streaming
+│   └── prompts.py               # All prompt templates
+├── templates/
+│   ├── core/
+│   │   ├── base.html            # Root (loads Tailwind CDN, HTMX)
+│   │   ├── base_customer.html   # Orange/amber, top navbar
+│   │   └── base_internal.html   # Indigo/slate, sidebar
+│   ├── features/
+│   │   ├── submit.html          # Page 1
+│   │   ├── roadmap.html         # Page 2 (timeline)
+│   │   └── partials/
+│   │       └── vote_button.html
+│   ├── roadmap/
+│   │   ├── edit.html            # Page 3
+│   │   └── partials/
+│   ├── goals/
+│   │   └── edit.html            # Page 4
+│   ├── reports/
+│   │   ├── chat.html            # Page 5
+│   │   └── partials/
+│   └── clusters/
+│       ├── list.html            # Page 6
+│       ├── detail.html
+│       └── partials/
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+├── .env
 ├── AGENTS.md
 ├── CLAUDE.md
 └── README.md
@@ -197,45 +244,51 @@ biteflight-feature-tracker/
 
 ---
 
-## Implementation Priorities (PoC Phases)
+## AI Integration Points
 
-### Phase 1 — Foundation
-- [ ] Project scaffolding (FastAPI, PostgreSQL + pgvector, Docker Compose)
-- [ ] Data models and migrations
-- [ ] CRUD endpoints for feature requests
-- [ ] Voting system
+| Operation                  | Model                              | When it runs              |
+|----------------------------|------------------------------------|---------------------------|
+| Extract structured fields  | OpenAI gpt-4o-mini                 | On request submission (Huey task) |
+| Generate embedding         | OpenAI text-embedding-3-large (1536 dims) | On request submission (Huey task) |
+| Find similar requests      | pgvector cosine similarity search  | On search / RAG context   |
+| Cluster requests           | HDBSCAN on embeddings              | Manual trigger from UI    |
+| Generate cluster labels    | OpenAI gpt-4o-mini                 | After clustering          |
+| Report generation / chat   | OpenAI gpt-6-sol (streamed SSE)    | On-demand in chat         |
 
-### Phase 2 — AI Layer
-- [ ] Embedding generation on ingest (background task)
-- [ ] Semantic search endpoint
-- [ ] AI field extraction on submission (category, sentiment, urgency via Claude)
-- [ ] Similar request detection (suggest duplicates before submission)
+---
 
-### Phase 3 — Clustering & Insights
-- [ ] Batch clustering job on stored embeddings
-- [ ] AI-generated cluster labels and summaries
-- [ ] Prioritization scoring formula
-- [ ] Trending/insights endpoints
+## URL Routing
 
-### Phase 4 — Reporting
-- [ ] Report generation via Claude (structured output)
-- [ ] Segment-specific and cross-segment reports
-- [ ] Caching layer for generated reports
+```
+/                           → Redirect to /submit/
+/submit/                    → Page 1: Submit feature request
+/roadmap/                   → Page 2: Customer roadmap + voting
+/internal/roadmap/          → Page 3: Internal roadmap editor
+/internal/goals/            → Page 4: Company goals editor
+/internal/reports/          → Page 5: AI reports & chat
+/internal/clusters/         → Page 6: Cluster viewer
+/admin/                     → Django admin
+```
 
-### Phase 5 — Polish & Scale Testing
-- [ ] Seed data generator (hundreds of thousands of realistic BiteFlight requests)
-- [ ] Performance benchmarks (search latency, clustering time, report generation time)
-- [ ] Frontend (if in scope)
+---
+
+## Docker Compose Services
+
+| Service  | Image                    | Port  |
+|----------|--------------------------|-------|
+| db       | pgvector/pgvector:pg16   | 5432  |
+| redis    | redis:7-alpine           | 6379  |
+| web      | Custom (Dockerfile)      | 8000  |
+| worker   | Custom (Huey consumer)   | —     |
 
 ---
 
 ## Conventions & Constraints
 
-- **Python 3.11+** with type hints throughout.
-- **Async/await** for all I/O-bound operations.
-- Use **Pydantic v2** for request/response schemas.
-- Use **SQLAlchemy 2.0** async style for ORM.
-- All AI calls must be **non-blocking** (async or background tasks).
-- Environment variables for all secrets and config (API keys, DB connection strings).
-- Keep AI prompts in dedicated files or constants, not inline in business logic.
-- Tests use **pytest** with **pytest-asyncio**.
+- **Django 5.1** with Python 3.11+.
+- **No authentication** — this is a demo/PoC.
+- Environment variables for all secrets and config (`.env` file).
+- AI prompts stored in `ai_services/prompts.py`, not inline.
+- All AI calls are **non-blocking** (Huey background tasks or SSE streaming).
+- Tailwind CSS via CDN — no build step.
+- HTMX for interactive updates without full page reloads.
