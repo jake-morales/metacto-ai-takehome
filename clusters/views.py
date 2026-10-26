@@ -32,6 +32,17 @@ def cluster_detail(request, pk):
 def trigger_clustering(request):
     from clusters.tasks import run_clustering_task
     from .models import ClusteringRun
+    from features.models import FeatureRequest
+    from django.contrib import messages
+
+    count = FeatureRequest.objects.exclude(embedding=None).count()
+    if count < 5:
+        messages.warning(
+            request,
+            f"Need at least 5 feature requests with embeddings to cluster (have {count}). "
+            "Submit more requests and wait for the worker to process them."
+        )
+        return redirect("cluster_list")
 
     run = ClusteringRun.objects.create(status="pending")
     run_clustering_task(str(run.id))

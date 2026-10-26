@@ -7,7 +7,7 @@ def run_clustering_task(run_id: str):
     from clusters.models import ClusteringRun
 
     try:
-        run_clustering()
+        run_clustering(run_id)
     except Exception as e:
         ClusteringRun.objects.filter(id=run_id).update(status="failed")
         raise

@@ -6,17 +6,19 @@ from .client import get_client
 from .prompts import CLUSTER_LABEL_SYSTEM, CLUSTER_LABEL_USER
 
 
-def run_clustering():
+def run_clustering(run_id: str):
     """
     Fetches all FeatureRequests with embeddings, runs HDBSCAN clustering,
-    creates ClusteringRun + Cluster + ClusterMembership records.
+    creates Cluster + ClusterMembership records on the given ClusteringRun.
     Returns the ClusteringRun instance.
     """
     import hdbscan
     from features.models import FeatureRequest
     from clusters.models import ClusteringRun, Cluster, ClusterMembership
 
-    run = ClusteringRun.objects.create(status="running")
+    run = ClusteringRun.objects.get(id=run_id)
+    run.status = "running"
+    run.save(update_fields=["status"])
 
     try:
         requests = list(
@@ -24,12 +26,6 @@ def run_clustering():
                 "id", "title", "description", "segment", "embedding"
             )
         )
-
-        if len(requests) < 5:
-            run.status = "failed"
-            run.completed_at = timezone.now()
-            run.save()
-            return run
 
         ids = [r["id"] for r in requests]
         embeddings = np.array([r["embedding"] for r in requests], dtype=np.float32)

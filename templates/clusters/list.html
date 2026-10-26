@@ -3,6 +3,16 @@
 {% block page_title %}Feature Request Clusters{% endblock %}
 
 {% block content %}
+{% if messages %}
+  {% for message in messages %}
+    <div class="mb-4 px-4 py-3 rounded-lg border
+      {% if message.tags == 'warning' %}bg-amber-900/30 border-amber-700 text-amber-300
+      {% else %}bg-red-900/30 border-red-700 text-red-300{% endif %}
+      text-sm">
+      {{ message }}
+    </div>
+  {% endfor %}
+{% endif %}
 <!-- Header actions -->
 <div class="flex items-center justify-between mb-6">
   <div>
