@@ -31,28 +31,42 @@ def run_clustering(run_id: str):
         embeddings = np.array([r["embedding"] for r in requests], dtype=np.float32)
 
         n = len(requests)
+
+        # Reduce to low-dimensional space with UMAP before clustering.
+        # HDBSCAN degrades in high dimensions (curse of dimensionality) —
+        # all points appear equidistant, so density estimation fails.
+        import umap
+        from sklearn.preprocessing import normalize
+
+        normed = normalize(np.array(embeddings, dtype=np.float32))
+        reducer = umap.UMAP(
+            n_components=min(15, n - 2),
+            metric="cosine",
+            n_neighbors=min(15, n - 1),
+            min_dist=0.0,
+            random_state=42,
+        )
+        reduced = reducer.fit_transform(normed)
+
         clusterer = hdbscan.HDBSCAN(
-            min_cluster_size=max(2, min(3, n // 3)),
+            min_cluster_size=max(2, n // 10),
             min_samples=1,
             metric="euclidean",
+            cluster_selection_method="leaf",
         )
-        labels = clusterer.fit_predict(embeddings)
+        labels = clusterer.fit_predict(reduced)
         probabilities = clusterer.probabilities_
 
-        # If HDBSCAN assigned everything to noise (common with small/sparse
-        # datasets), fall back to cosine-similarity agglomerative clustering.
+        # If HDBSCAN assigned everything to noise, fall back to
+        # agglomerative clustering on the UMAP-reduced embeddings.
         if set(labels) == {-1} and n >= 2:
             from sklearn.cluster import AgglomerativeClustering
-            from sklearn.preprocessing import normalize
 
-            normed = normalize(embeddings)
-            n_clusters = max(2, n // 3)
+            n_clusters = max(2, n // 10)
             agg = AgglomerativeClustering(
                 n_clusters=n_clusters,
-                metric="cosine",
-                linkage="average",
             )
-            labels = agg.fit_predict(normed)
+            labels = agg.fit_predict(reduced)
             probabilities = np.ones(len(labels), dtype=np.float32)
 
         unique_labels = set(labels) - {-1}

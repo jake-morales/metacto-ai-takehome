@@ -4,15 +4,15 @@ from .models import ClusteringRun, Cluster
 
 
 def cluster_list(request):
-    latest_run = ClusteringRun.objects.filter(status="completed").first()
-    all_runs = ClusteringRun.objects.all()[:5]
-    clusters = latest_run.clusters.order_by("-request_count") if latest_run else []
+    latest_run = ClusteringRun.objects.order_by("-started_at").first()
+    clusters = latest_run.clusters.order_by("-request_count") if latest_run and latest_run.status == "completed" else []
 
     context = {
         "latest_run": latest_run,
-        "all_runs": all_runs,
         "clusters": clusters,
     }
+    if request.headers.get("HX-Request"):
+        return render(request, "clusters/partials/cluster_content.html", context)
     return render(request, "clusters/list.html", context)
 
 
