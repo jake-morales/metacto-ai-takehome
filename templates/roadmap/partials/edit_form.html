@@ -1,0 +1,39 @@
+<div class="bg-slate-800 rounded-xl border border-indigo-700 p-5 mb-4">
+  <h3 class="text-white font-semibold mb-4">Editing: {{ item.title }}</h3>
+  <form method="post" action="{% url 'edit_roadmap_item' item.pk %}"
+    hx-post="{% url 'edit_roadmap_item' item.pk %}"
+    hx-target="#items-list"
+    hx-swap="innerHTML">
+    {% csrf_token %}
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-400 mb-1">Title</label>
+        {{ form.title }}
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-400 mb-1">Description</label>
+        {{ form.description }}
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Status</label>
+          {{ form.status }}
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Order</label>
+          {{ form.order }}
+        </div>
+      </div>
+    </div>
+    <div class="mt-4 flex gap-2">
+      <button type="submit"
+        class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2 rounded-lg transition">
+        Save Changes
+      </button>
+      <a href="{% url 'edit_roadmap' %}"
+        class="px-4 py-2 text-sm text-slate-400 hover:text-slate-300 border border-slate-600 rounded-lg transition">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>

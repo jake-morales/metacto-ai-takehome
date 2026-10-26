@@ -1,0 +1,13 @@
+<div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition">
+  <div class="flex items-start justify-between gap-3">
+    <div class="flex-1 min-w-0">
+      <h3 class="font-semibold text-gray-900 text-sm leading-snug">{{ item.title }}</h3>
+      {% if item.description %}
+        <p class="text-gray-500 text-xs mt-1 line-clamp-3">{{ item.description }}</p>
+      {% endif %}
+    </div>
+    <div class="flex-shrink-0" id="vote-{{ item.pk }}">
+      {% include "features/partials/vote_button.html" %}
+    </div>
+  </div>
+</div>

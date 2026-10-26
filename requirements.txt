@@ -1,0 +1,10 @@
+django>=5.1
+psycopg[binary]>=3.1
+pgvector>=0.3
+huey>=2.5
+redis>=5.0
+openai>=1.30
+hdbscan>=0.8
+numpy>=1.26
+scikit-learn>=1.4
+markdown>=3.6

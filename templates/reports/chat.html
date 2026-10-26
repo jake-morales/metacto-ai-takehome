@@ -1,0 +1,218 @@
+{% extends "core/base_internal.html" %}
+{% load markdown_extras %}
+{% block title %}{{ session.title }} — AI Reports{% endblock %}
+{% block page_title %}{{ session.title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .prose-dark { color: #cbd5e1; line-height: 1.7; }
+  .prose-dark h1,.prose-dark h2,.prose-dark h3 { color: #f1f5f9; font-weight: 700; margin: 1rem 0 0.5rem; }
+  .prose-dark h1 { font-size: 1.25rem; }
+  .prose-dark h2 { font-size: 1.1rem; }
+  .prose-dark h3 { font-size: 1rem; }
+  .prose-dark p { margin: 0.5rem 0; }
+  .prose-dark ul, .prose-dark ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+  .prose-dark li { margin: 0.25rem 0; }
+  .prose-dark strong { color: #f1f5f9; }
+  .prose-dark code { background: #334155; padding: 0.1em 0.3em; border-radius: 4px; font-size: 0.85em; }
+  .prose-dark hr { border-color: #334155; margin: 1rem 0; }
+  .streaming-cursor::after { content: "▋"; animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-[calc(100vh-4rem)] -m-6 overflow-hidden">
+
+  <!-- Sessions sidebar -->
+  <div class="w-56 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden">
+    <div class="p-3 border-b border-slate-700">
+      <form method="post" action="{% url 'create_report_session' %}">
+        {% csrf_token %}
+        <button type="submit"
+          class="w-full flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 rounded-lg transition">
+          ✨ New Report
+        </button>
+      </form>
+    </div>
+    <div class="flex-1 overflow-y-auto p-2">
+      {% for s in sessions %}
+        <a href="{% url 'report_chat' s.pk %}"
+          class="block px-2 py-2 rounded-lg text-xs transition mb-1
+            {% if s.pk == session.pk %}bg-indigo-600 text-white{% else %}text-slate-400 hover:bg-slate-700 hover:text-slate-300{% endif %}">
+          <div class="font-medium truncate">{{ s.title }}</div>
+          <div class="text-slate-500 text-xs mt-0.5 {% if s.pk == session.pk %}text-indigo-200{% endif %}">
+            {{ s.created_at|date:"M d, Y" }}
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Chat area -->
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <!-- Rename bar -->
+    <div class="flex items-center gap-3 px-4 py-2.5 bg-slate-800 border-b border-slate-700">
+      <form method="post" action="{% url 'rename_report_session' session.pk %}" class="flex-1 flex gap-2">
+        {% csrf_token %}
+        <input type="text" name="title" value="{{ session.title }}"
+          class="flex-1 bg-transparent text-slate-300 text-sm focus:outline-none border-b border-transparent focus:border-indigo-500 transition px-1">
+        <button type="submit" class="text-xs text-slate-500 hover:text-slate-300 transition">Save</button>
+      </form>
+      <form method="post" action="{% url 'delete_report_session' session.pk %}"
+        onsubmit="return confirm('Delete this report?')">
+        {% csrf_token %}
+        <button type="submit" class="text-xs text-red-500 hover:text-red-400 transition">Delete</button>
+      </form>
+    </div>
+
+    <!-- Messages -->
+    <div class="flex-1 overflow-y-auto p-5 space-y-5" id="messages">
+      {% for message in messages %}
+        {% if message.role == "user" %}
+          <div class="flex justify-end">
+            <div class="max-w-2xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed">
+              {{ message.content }}
+            </div>
+          </div>
+        {% else %}
+          <div class="flex justify-start">
+            <div class="max-w-3xl bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-sm px-5 py-4">
+              <div class="prose-dark text-sm">{{ message.content|markdown }}</div>
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+
+      <!-- Streaming response area (shown when waiting for AI) -->
+      <div id="streaming-area" class="hidden flex justify-start">
+        <div class="max-w-3xl bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-sm px-5 py-4">
+          <div id="streaming-content" class="prose-dark text-sm streaming-cursor"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input form -->
+    <div class="border-t border-slate-700 p-4 bg-slate-900">
+      <form id="chat-form" method="post" action="{% url 'send_chat_message' session.pk %}">
+        {% csrf_token %}
+        <div class="flex gap-3">
+          <textarea
+            name="content"
+            id="chat-input"
+            rows="2"
+            placeholder="Ask a follow-up question about the feature requests..."
+            class="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitMessage();}"></textarea>
+          <button type="button" onclick="submitMessage()"
+            class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition self-end">
+            Send →
+          </button>
+        </div>
+        <p class="text-slate-600 text-xs mt-2">Press Enter to send, Shift+Enter for new line.</p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+const SESSION_PK = "{{ session.pk }}";
+const STREAM_URL = "{% url 'stream_chat_response' session.pk %}";
+let currentEventSource = null;
+
+function scrollToBottom() {
+  const messages = document.getElementById('messages');
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function showStreamingArea() {
+  const area = document.getElementById('streaming-area');
+  area.classList.remove('hidden');
+  area.classList.add('flex');
+}
+
+function hideStreamingArea() {
+  document.getElementById('streaming-area').classList.add('hidden');
+  document.getElementById('streaming-area').classList.remove('flex');
+  document.getElementById('streaming-content').textContent = '';
+}
+
+function startStreaming() {
+  if (currentEventSource) {
+    currentEventSource.close();
+  }
+  showStreamingArea();
+  scrollToBottom();
+
+  const streamContent = document.getElementById('streaming-content');
+  let buffer = '';
+  currentEventSource = new EventSource(STREAM_URL);
+
+  currentEventSource.onmessage = function(e) {
+    if (e.data === '[DONE]') {
+      currentEventSource.close();
+      currentEventSource = null;
+      // Reload page to show saved messages
+      window.location.reload();
+      return;
+    }
+    if (e.data.startsWith('[ERROR]')) {
+      streamContent.textContent += '\n\nError: ' + e.data.replace('[ERROR] ', '');
+      streamContent.classList.remove('streaming-cursor');
+      currentEventSource.close();
+      return;
+    }
+    buffer += e.data;
+    streamContent.textContent = buffer;
+    scrollToBottom();
+  };
+
+  currentEventSource.onerror = function() {
+    currentEventSource.close();
+    currentEventSource = null;
+  };
+}
+
+function submitMessage() {
+  const input = document.getElementById('chat-input');
+  const content = input.value.trim();
+  if (!content) return;
+
+  // Optimistically add user message to UI
+  const messages = document.getElementById('messages');
+  const userDiv = document.createElement('div');
+  userDiv.className = 'flex justify-end';
+  userDiv.innerHTML = `<div class="max-w-2xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed">${content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+  messages.insertBefore(userDiv, document.getElementById('streaming-area'));
+
+  input.value = '';
+
+  // POST message to server, then start streaming
+  const form = document.getElementById('chat-form');
+  const formData = new FormData(form);
+  formData.set('content', content);
+
+  fetch(form.action, {
+    method: 'POST',
+    body: formData,
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    redirect: 'manual',
+  }).then(() => {
+    startStreaming();
+  }).catch(() => {
+    startStreaming();
+  });
+}
+
+// Auto-start streaming if the page loads with only a user message (new session)
+{% if needs_initial_response %}
+document.addEventListener('DOMContentLoaded', function() {
+  startStreaming();
+});
+{% endif %}
+
+// Scroll to bottom on load
+document.addEventListener('DOMContentLoaded', scrollToBottom);
+</script>
+{% endblock %}

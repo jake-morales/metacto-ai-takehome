@@ -1,0 +1,23 @@
+{% if voted %}
+<form method="post" action="/roadmap/unvote/{{ item.pk }}/"
+  hx-post="/roadmap/unvote/{{ item.pk }}/"
+  hx-target="#vote-{{ item.pk }}"
+  hx-swap="innerHTML">
+  {% csrf_token %}
+  <button type="submit"
+    class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-orange-500 text-white hover:bg-orange-400 transition">
+    ▲ {{ item.vote_count }} Voted
+  </button>
+</form>
+{% else %}
+<form method="post" action="/roadmap/vote/{{ item.pk }}/"
+  hx-post="/roadmap/vote/{{ item.pk }}/"
+  hx-target="#vote-{{ item.pk }}"
+  hx-swap="innerHTML">
+  {% csrf_token %}
+  <button type="submit"
+    class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white border border-orange-300 text-orange-600 hover:bg-orange-50 transition">
+    ▲ {{ item.vote_count }} Vote
+  </button>
+</form>
+{% endif %}

@@ -1,0 +1,76 @@
+{% extends "core/base_customer.html" %}
+{% block title %}Product Roadmap — BiteFlight{% endblock %}
+
+{% block content %}
+<div>
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Product Roadmap 🗺️</h1>
+    <p class="mt-2 text-gray-500">
+      See what we're building and vote for the features you'd like most.
+      Your votes help us prioritize what matters to you.
+    </p>
+  </div>
+
+  {% if not planned and not in_progress and not shipped %}
+    <div class="text-center py-16 text-gray-400">
+      <p class="text-5xl mb-4">🚧</p>
+      <p class="text-lg font-medium">The roadmap is being built</p>
+      <p class="mt-2 text-sm">Check back soon, or <a href="/submit/" class="text-orange-500 hover:underline">submit a feature request</a>.</p>
+    </div>
+  {% else %}
+
+    {% if in_progress %}
+    <section class="mb-10">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+        <h2 class="text-lg font-bold text-gray-800">In Progress</h2>
+        <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{ in_progress|length }}</span>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        {% for entry in in_progress %}
+          {% include "features/partials/roadmap_card.html" with item=entry.item voted=entry.voted %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if planned %}
+    <section class="mb-10">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="w-3 h-3 rounded-full bg-blue-400"></span>
+        <h2 class="text-lg font-bold text-gray-800">Planned</h2>
+        <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{ planned|length }}</span>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        {% for entry in planned %}
+          {% include "features/partials/roadmap_card.html" with item=entry.item voted=entry.voted %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if shipped %}
+    <section class="mb-10">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="w-3 h-3 rounded-full bg-green-400"></span>
+        <h2 class="text-lg font-bold text-gray-800">Shipped ✓</h2>
+        <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{ shipped|length }}</span>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2 opacity-75">
+        {% for entry in shipped %}
+          {% include "features/partials/roadmap_card.html" with item=entry.item voted=entry.voted %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+  {% endif %}
+
+  <div class="mt-8 text-center">
+    <a href="/submit/"
+      class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-xl text-sm transition shadow-sm">
+      💡 Submit a Feature Request
+    </a>
+  </div>
+</div>
+{% endblock %}

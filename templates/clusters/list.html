@@ -1,0 +1,85 @@
+{% extends "core/base_internal.html" %}
+{% block title %}Clusters — BiteFlight Internal{% endblock %}
+{% block page_title %}Feature Request Clusters{% endblock %}
+
+{% block content %}
+<!-- Header actions -->
+<div class="flex items-center justify-between mb-6">
+  <div>
+    {% if latest_run %}
+      <p class="text-slate-400 text-sm">
+        Latest run: <span class="text-slate-300">{{ latest_run.started_at|date:"M d, Y H:i" }}</span>
+        — <span class="text-slate-300">{{ latest_run.num_clusters }} clusters</span>
+        from <span class="text-slate-300">{{ latest_run.num_requests_processed }} requests</span>
+      </p>
+    {% else %}
+      <p class="text-slate-400 text-sm">No clustering run yet.</p>
+    {% endif %}
+  </div>
+  <form method="post" action="{% url 'trigger_clustering' %}">
+    {% csrf_token %}
+    <button type="submit"
+      class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+      🔄 Run Clustering
+    </button>
+  </form>
+</div>
+
+<!-- Recent run history -->
+{% if all_runs %}
+<div class="mb-6 flex gap-2 flex-wrap">
+  {% for run in all_runs %}
+    <span class="text-xs px-2.5 py-1 rounded-full border
+      {% if run.status == 'completed' %}border-green-700 text-green-400 bg-green-900/30
+      {% elif run.status == 'running' %}border-amber-700 text-amber-400 bg-amber-900/30
+      {% elif run.status == 'failed' %}border-red-700 text-red-400 bg-red-900/30
+      {% else %}border-slate-700 text-slate-400{% endif %}">
+      {{ run.status }} — {{ run.started_at|date:"M d H:i" }}
+    </span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Clusters grid -->
+{% if clusters %}
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+  {% for cluster in clusters %}
+    <a href="{% url 'cluster_detail' cluster.pk %}"
+      class="block bg-slate-800 rounded-xl border border-slate-700 p-4 hover:border-indigo-600 transition group">
+      <div class="flex items-start justify-between gap-2 mb-2">
+        <h3 class="text-white font-semibold text-sm group-hover:text-indigo-400 transition leading-snug">
+          {{ cluster.label }}
+        </h3>
+        <span class="flex-shrink-0 bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full">
+          {{ cluster.request_count }}
+        </span>
+      </div>
+      {% if cluster.theme %}
+        <span class="inline-block text-xs text-indigo-400 bg-indigo-900/40 border border-indigo-800 px-2 py-0.5 rounded mb-2">
+          {{ cluster.theme }}
+        </span>
+      {% endif %}
+      {% if cluster.summary %}
+        <p class="text-slate-400 text-xs line-clamp-3">{{ cluster.summary }}</p>
+      {% endif %}
+      <div class="flex items-center gap-4 mt-3 pt-3 border-t border-slate-700">
+        {% if cluster.avg_sentiment is not None %}
+          <span class="text-xs text-slate-500">
+            Sentiment:
+            <span class="{% if cluster.avg_sentiment > 0.2 %}text-green-400{% elif cluster.avg_sentiment < -0.2 %}text-red-400{% else %}text-slate-400{% endif %}">
+              {{ cluster.avg_sentiment|floatformat:2 }}
+            </span>
+          </span>
+        {% endif %}
+      </div>
+    </a>
+  {% endfor %}
+</div>
+{% else %}
+  <div class="text-center py-20 text-slate-500">
+    <p class="text-4xl mb-4">🔗</p>
+    <p class="font-medium text-slate-400">No clusters yet</p>
+    <p class="text-sm mt-1">Submit some feature requests, then run clustering to discover themes.</p>
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "core/base.html" %}
+{% block body %}
+<!-- Customer nav: orange/amber theme -->
+<nav class="bg-orange-500 shadow-md">
+  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2">
+      <span class="text-2xl">🍔</span>
+      <span class="text-white font-bold text-xl tracking-tight">BiteFlight</span>
+    </a>
+    <div class="flex items-center gap-6">
+      <a href="/submit/" class="text-white/90 hover:text-white font-medium text-sm transition">Submit Request</a>
+      <a href="/roadmap/" class="text-white/90 hover:text-white font-medium text-sm transition">Roadmap</a>
+    </div>
+  </div>
+</nav>
+
+<main class="max-w-5xl mx-auto px-4 py-8">
+  {% if messages %}
+    {% for message in messages %}
+      <div class="mb-4 p-3 rounded-lg text-sm
+        {% if message.tags == 'success' %}bg-green-100 text-green-800 border border-green-200
+        {% elif message.tags == 'error' %}bg-red-100 text-red-800 border border-red-200
+        {% else %}bg-orange-100 text-orange-800 border border-orange-200{% endif %}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="mt-16 border-t border-orange-100 py-6 text-center text-sm text-gray-400">
+  BiteFlight &copy; 2026 &mdash; Help us build a better app
+</footer>
+{% endblock %}

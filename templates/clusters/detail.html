@@ -1,0 +1,88 @@
+{% extends "core/base_internal.html" %}
+{% block title %}{{ cluster.label }} — Clusters{% endblock %}
+{% block page_title %}Cluster: {{ cluster.label }}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="{% url 'cluster_list' %}" class="text-slate-400 hover:text-slate-300 text-sm">← Back to Clusters</a>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <!-- Cluster metadata -->
+  <div class="lg:col-span-1">
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-5">
+      <h2 class="text-white font-semibold text-lg mb-1">{{ cluster.label }}</h2>
+      {% if cluster.theme %}
+        <span class="inline-block text-xs text-indigo-400 bg-indigo-900/40 border border-indigo-800 px-2 py-0.5 rounded mb-3">
+          {{ cluster.theme }}
+        </span>
+      {% endif %}
+      {% if cluster.summary %}
+        <p class="text-slate-300 text-sm leading-relaxed mb-4">{{ cluster.summary }}</p>
+      {% endif %}
+
+      <div class="space-y-2 pt-4 border-t border-slate-700">
+        <div class="flex justify-between text-sm">
+          <span class="text-slate-400">Requests</span>
+          <span class="text-white font-semibold">{{ cluster.request_count }}</span>
+        </div>
+        {% if cluster.avg_sentiment is not None %}
+        <div class="flex justify-between text-sm">
+          <span class="text-slate-400">Avg sentiment</span>
+          <span class="font-semibold
+            {% if cluster.avg_sentiment > 0.2 %}text-green-400
+            {% elif cluster.avg_sentiment < -0.2 %}text-red-400
+            {% else %}text-slate-300{% endif %}">
+            {{ cluster.avg_sentiment|floatformat:2 }}
+          </span>
+        </div>
+        {% endif %}
+        <div class="flex justify-between text-sm">
+          <span class="text-slate-400">Run date</span>
+          <span class="text-slate-300">{{ cluster.run.started_at|date:"M d, Y" }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sample requests -->
+  <div class="lg:col-span-2">
+    <h3 class="text-slate-300 font-semibold mb-3 text-sm uppercase tracking-wide">
+      Sample Requests ({{ samples|length }})
+    </h3>
+    <div class="space-y-3">
+      {% for request in samples %}
+        <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+          <div class="flex items-start gap-3">
+            <span class="flex-shrink-0 mt-0.5 px-2 py-0.5 text-xs rounded font-medium
+              {% if request.segment == 'user' %}bg-blue-900/60 text-blue-300 border border-blue-800
+              {% elif request.segment == 'driver' %}bg-amber-900/60 text-amber-300 border border-amber-800
+              {% else %}bg-purple-900/60 text-purple-300 border border-purple-800{% endif %}">
+              {{ request.segment }}
+            </span>
+            <div class="flex-1 min-w-0">
+              <h4 class="text-white text-sm font-medium">{{ request.title }}</h4>
+              <p class="text-slate-400 text-xs mt-1 line-clamp-3">{{ request.description }}</p>
+              <div class="flex items-center gap-3 mt-2">
+                {% if request.category %}
+                  <span class="text-xs text-slate-500">📁 {{ request.category }}</span>
+                {% endif %}
+                {% if request.urgency is not None %}
+                  <span class="text-xs text-slate-500">
+                    🔥 urgency {{ request.urgency|floatformat:1 }}
+                  </span>
+                {% endif %}
+                <span class="text-xs text-slate-600">{{ request.created_at|date:"M d, Y" }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% empty %}
+        <p class="text-slate-500 text-sm">No requests found in this cluster.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

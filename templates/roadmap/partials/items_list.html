@@ -1,0 +1,47 @@
+{% for item in items %}
+<div class="bg-slate-800 rounded-xl border border-slate-700 p-4 mb-3">
+  <div class="flex items-start justify-between gap-4">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 mb-1">
+        {% if item.status == "planned" %}
+          <span class="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0"></span>
+          <span class="text-xs text-blue-400 font-medium">Planned</span>
+        {% elif item.status == "in_progress" %}
+          <span class="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0"></span>
+          <span class="text-xs text-amber-400 font-medium">In Progress</span>
+        {% else %}
+          <span class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"></span>
+          <span class="text-xs text-green-400 font-medium">Shipped</span>
+        {% endif %}
+        <span class="text-slate-600 text-xs">#{{ item.order }}</span>
+      </div>
+      <h3 class="text-white font-medium text-sm">{{ item.title }}</h3>
+      {% if item.description %}
+        <p class="text-slate-400 text-xs mt-1 line-clamp-2">{{ item.description }}</p>
+      {% endif %}
+      <div class="flex items-center gap-3 mt-2">
+        <span class="text-slate-500 text-xs">🗳 {{ item.vote_count }} votes</span>
+        <span class="text-slate-500 text-xs">🔗 {{ item.linked_requests.count }} requests linked</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <a href="{% url 'edit_roadmap_item' item.pk %}"
+        class="text-xs text-indigo-400 hover:text-indigo-300 px-2 py-1 rounded border border-indigo-700 hover:border-indigo-500 transition">
+        Edit
+      </a>
+      <form method="post" action="{% url 'delete_roadmap_item' item.pk %}" class="inline"
+        onsubmit="return confirm('Delete this item?')">
+        {% csrf_token %}
+        <button type="submit"
+          class="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded border border-red-900 hover:border-red-700 transition">
+          Delete
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% empty %}
+<div class="text-slate-500 text-sm text-center py-12 bg-slate-800 rounded-xl border border-slate-700">
+  No roadmap items yet. Add one using the form on the left.
+</div>
+{% endfor %}
