@@ -27,17 +27,6 @@
           <span class="text-slate-400">Requests</span>
           <span class="text-white font-semibold">{{ cluster.request_count }}</span>
         </div>
-        {% if cluster.avg_sentiment is not None %}
-        <div class="flex justify-between text-sm">
-          <span class="text-slate-400">Avg sentiment</span>
-          <span class="font-semibold
-            {% if cluster.avg_sentiment > 0.2 %}text-green-400
-            {% elif cluster.avg_sentiment < -0.2 %}text-red-400
-            {% else %}text-slate-300{% endif %}">
-            {{ cluster.avg_sentiment|floatformat:2 }}
-          </span>
-        </div>
-        {% endif %}
         <div class="flex justify-between text-sm">
           <span class="text-slate-400">Run date</span>
           <span class="text-slate-300">{{ cluster.run.started_at|date:"M d, Y" }}</span>

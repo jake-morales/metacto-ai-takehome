@@ -73,14 +73,6 @@
         <p class="text-slate-400 text-xs line-clamp-3">{{ cluster.summary }}</p>
       {% endif %}
       <div class="flex items-center gap-4 mt-3 pt-3 border-t border-slate-700">
-        {% if cluster.avg_sentiment is not None %}
-          <span class="text-xs text-slate-500">
-            Sentiment:
-            <span class="{% if cluster.avg_sentiment > 0.2 %}text-green-400{% elif cluster.avg_sentiment < -0.2 %}text-red-400{% else %}text-slate-400{% endif %}">
-              {{ cluster.avg_sentiment|floatformat:2 }}
-            </span>
-          </span>
-        {% endif %}
       </div>
     </a>
   {% endfor %}

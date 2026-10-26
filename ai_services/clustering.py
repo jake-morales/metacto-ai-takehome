@@ -30,13 +30,30 @@ def run_clustering(run_id: str):
         ids = [r["id"] for r in requests]
         embeddings = np.array([r["embedding"] for r in requests], dtype=np.float32)
 
+        n = len(requests)
         clusterer = hdbscan.HDBSCAN(
-            min_cluster_size=max(3, len(requests) // 20),
-            min_samples=2,
+            min_cluster_size=max(2, min(3, n // 3)),
+            min_samples=1,
             metric="euclidean",
         )
         labels = clusterer.fit_predict(embeddings)
         probabilities = clusterer.probabilities_
+
+        # If HDBSCAN assigned everything to noise (common with small/sparse
+        # datasets), fall back to cosine-similarity agglomerative clustering.
+        if set(labels) == {-1} and n >= 2:
+            from sklearn.cluster import AgglomerativeClustering
+            from sklearn.preprocessing import normalize
+
+            normed = normalize(embeddings)
+            n_clusters = max(2, n // 3)
+            agg = AgglomerativeClustering(
+                n_clusters=n_clusters,
+                metric="cosine",
+                linkage="average",
+            )
+            labels = agg.fit_predict(normed)
+            probabilities = np.ones(len(labels), dtype=np.float32)
 
         unique_labels = set(labels) - {-1}
         run.num_clusters = len(unique_labels)
@@ -71,15 +88,6 @@ def run_clustering(run_id: str):
                 theme=label_data.get("theme", ""),
                 request_count=len(members),
             )
-
-            # Compute sentiment and vote stats
-            fr_ids = [ids[m[0]] for m in members]
-            from features.models import FeatureRequest as FR
-            agg = FR.objects.filter(id__in=fr_ids).values_list("sentiment")
-            sentiments = [s[0] for s in agg if s[0] is not None]
-            if sentiments:
-                cluster.avg_sentiment = sum(sentiments) / len(sentiments)
-                cluster.save()
 
             memberships = []
             for idx, prob in members:

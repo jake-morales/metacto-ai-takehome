@@ -9,7 +9,7 @@ class ClusteringRunAdmin(admin.ModelAdmin):
 
 @admin.register(Cluster)
 class ClusterAdmin(admin.ModelAdmin):
-    list_display = ["label", "theme", "request_count", "avg_sentiment"]
+    list_display = ["label", "theme", "request_count"]
     list_filter = ["run"]
 
 
