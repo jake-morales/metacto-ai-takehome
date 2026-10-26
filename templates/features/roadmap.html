@@ -2,12 +2,11 @@
 {% block title %}Product Roadmap — BiteFlight{% endblock %}
 
 {% block content %}
-<div>
-  <div class="mb-8">
-    <h1 class="text-3xl font-bold text-gray-900">Product Roadmap 🗺️</h1>
+<div class="max-w-3xl mx-auto sm:pl-28">
+  <div class="mb-10 text-center">
+    <h1 class="text-3xl font-bold text-gray-900">Product Roadmap</h1>
     <p class="mt-2 text-gray-500">
       See what we're building and vote for the features you'd like most.
-      Your votes help us prioritize what matters to you.
     </p>
   </div>
 
@@ -19,57 +18,163 @@
     </div>
   {% else %}
 
-    {% if in_progress %}
-    <section class="mb-10">
-      <div class="flex items-center gap-2 mb-4">
-        <span class="w-3 h-3 rounded-full bg-amber-400"></span>
-        <h2 class="text-lg font-bold text-gray-800">In Progress</h2>
-        <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{ in_progress|length }}</span>
-      </div>
-      <div class="grid gap-3 sm:grid-cols-2">
-        {% for entry in in_progress %}
-          {% include "features/partials/roadmap_card.html" with item=entry.item voted=entry.voted %}
-        {% endfor %}
-      </div>
-    </section>
-    {% endif %}
+  <!-- Timeline -->
+  <div class="relative">
+    <!-- Vertical line -->
+    <div class="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-green-400 via-amber-400 to-blue-400"></div>
 
-    {% if planned %}
-    <section class="mb-10">
-      <div class="flex items-center gap-2 mb-4">
-        <span class="w-3 h-3 rounded-full bg-blue-400"></span>
-        <h2 class="text-lg font-bold text-gray-800">Planned</h2>
-        <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{ planned|length }}</span>
-      </div>
-      <div class="grid gap-3 sm:grid-cols-2">
-        {% for entry in planned %}
-          {% include "features/partials/roadmap_card.html" with item=entry.item voted=entry.voted %}
-        {% endfor %}
-      </div>
-    </section>
-    {% endif %}
-
+    <!-- Shipped section -->
     {% if shipped %}
-    <section class="mb-10">
-      <div class="flex items-center gap-2 mb-4">
-        <span class="w-3 h-3 rounded-full bg-green-400"></span>
-        <h2 class="text-lg font-bold text-gray-800">Shipped ✓</h2>
-        <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{ shipped|length }}</span>
+    <div class="mb-2">
+      <div class="relative flex items-center gap-4 mb-6">
+        <div class="relative z-10 w-12 h-12 rounded-full bg-green-500 flex items-center justify-center shadow-lg shadow-green-500/25">
+          <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-lg font-bold text-gray-900">Shipped</h2>
+          <p class="text-xs text-green-600 font-medium">{{ shipped|length }} feature{{ shipped|length|pluralize }}</p>
+        </div>
       </div>
-      <div class="grid gap-3 sm:grid-cols-2 opacity-75">
-        {% for entry in shipped %}
-          {% include "features/partials/roadmap_card.html" with item=entry.item voted=entry.voted %}
-        {% endfor %}
+      {% for entry in shipped %}
+      <div class="relative ml-6 pl-10 pb-8">
+        <div class="absolute left-0 top-3 w-3 h-3 rounded-full bg-green-400 ring-4 ring-green-100"></div>
+        {% if entry.item.quarter_label %}
+        <div class="absolute -left-24 top-1.5 w-20 text-right hidden sm:block">
+          <span class="text-sm font-bold text-green-600">{{ entry.item.quarter_label }}</span>
+          <p class="text-[10px] text-gray-400">{{ entry.item.target_date|date:"M Y" }}</p>
+        </div>
+        {% endif %}
+        <div class="bg-white rounded-2xl border border-green-200 p-5 shadow-sm opacity-80">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Shipped</span>
+                {% if entry.item.quarter_label %}
+                  <span class="text-xs text-gray-400 sm:hidden">{{ entry.item.quarter_label }}</span>
+                {% endif %}
+              </div>
+              <h3 class="font-semibold text-gray-900 leading-snug">{{ entry.item.title }}</h3>
+              {% if entry.item.description %}
+                <p class="text-gray-500 text-sm mt-1.5 leading-relaxed">{{ entry.item.description }}</p>
+              {% endif %}
+            </div>
+            <div class="flex-shrink-0 pt-1" id="vote-{{ entry.item.pk }}">
+              {% include "features/partials/vote_button.html" with item=entry.item voted=entry.voted %}
+            </div>
+          </div>
+        </div>
       </div>
-    </section>
+      {% endfor %}
+    </div>
     {% endif %}
 
+    <!-- In Progress section -->
+    {% if in_progress %}
+    <div class="mb-2">
+      <div class="relative flex items-center gap-4 mb-6">
+        <div class="relative z-10 w-12 h-12 rounded-full bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/25">
+          <svg class="w-6 h-6 text-white animate-spin" style="animation-duration: 3s;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-lg font-bold text-gray-900">In Progress</h2>
+          <p class="text-xs text-amber-600 font-medium">{{ in_progress|length }} feature{{ in_progress|length|pluralize }}</p>
+        </div>
+      </div>
+      {% for entry in in_progress %}
+      <div class="relative ml-6 pl-10 pb-8">
+        <div class="absolute left-0 top-3 w-3 h-3 rounded-full bg-amber-400 ring-4 ring-amber-100 animate-pulse"></div>
+        {% if entry.item.quarter_label %}
+        <div class="absolute -left-24 top-1.5 w-20 text-right hidden sm:block">
+          <span class="text-sm font-bold text-amber-600">{{ entry.item.quarter_label }}</span>
+          <p class="text-[10px] text-gray-400">{{ entry.item.target_date|date:"M Y" }}</p>
+        </div>
+        {% endif %}
+        <div class="bg-white rounded-2xl border border-amber-200 p-5 shadow-sm hover:shadow-md transition">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">In Progress</span>
+                {% if entry.item.quarter_label %}
+                  <span class="text-xs text-gray-400 sm:hidden">{{ entry.item.quarter_label }}</span>
+                {% endif %}
+              </div>
+              <h3 class="font-semibold text-gray-900 leading-snug">{{ entry.item.title }}</h3>
+              {% if entry.item.description %}
+                <p class="text-gray-500 text-sm mt-1.5 leading-relaxed">{{ entry.item.description }}</p>
+              {% endif %}
+            </div>
+            <div class="flex-shrink-0 pt-1" id="vote-{{ entry.item.pk }}">
+              {% include "features/partials/vote_button.html" with item=entry.item voted=entry.voted %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Planned section -->
+    {% if planned %}
+    <div class="mb-2">
+      <div class="relative flex items-center gap-4 mb-6">
+        <div class="relative z-10 w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/25">
+          <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-lg font-bold text-gray-900">Planned</h2>
+          <p class="text-xs text-blue-600 font-medium">{{ planned|length }} feature{{ planned|length|pluralize }} — vote to help us prioritize!</p>
+        </div>
+      </div>
+      {% for entry in planned %}
+      <div class="relative ml-6 pl-10 pb-8 {% if forloop.last %}pb-0{% endif %}">
+        <div class="absolute left-0 top-3 w-3 h-3 rounded-full bg-blue-400 ring-4 ring-blue-100"></div>
+        {% if entry.item.quarter_label %}
+        <div class="absolute -left-24 top-1.5 w-20 text-right hidden sm:block">
+          <span class="text-sm font-bold text-blue-600">{{ entry.item.quarter_label }}</span>
+          <p class="text-[10px] text-gray-400">{{ entry.item.target_date|date:"M Y" }}</p>
+        </div>
+        {% endif %}
+        <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Planned</span>
+                {% if entry.item.quarter_label %}
+                  <span class="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{{ entry.item.quarter_label }} &middot; {{ entry.item.target_date|date:"M Y" }}</span>
+                {% endif %}
+                {% if entry.item.vote_count >= 100 %}
+                  <span class="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">Popular</span>
+                {% endif %}
+              </div>
+              <h3 class="font-semibold text-gray-900 leading-snug">{{ entry.item.title }}</h3>
+              {% if entry.item.description %}
+                <p class="text-gray-500 text-sm mt-1.5 leading-relaxed">{{ entry.item.description }}</p>
+              {% endif %}
+            </div>
+            <div class="flex-shrink-0 pt-1" id="vote-{{ entry.item.pk }}">
+              {% include "features/partials/vote_button.html" with item=entry.item voted=entry.voted %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
   {% endif %}
 
-  <div class="mt-8 text-center">
+  <div class="mt-10 text-center">
+    <p class="text-gray-400 text-sm mb-3">Don't see what you're looking for?</p>
     <a href="/submit/"
       class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-xl text-sm transition shadow-sm">
-      💡 Submit a Feature Request
+      Submit a Feature Request
     </a>
   </div>
 </div>
